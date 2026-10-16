@@ -1,78 +1,65 @@
-{
-  "cells": [
-    {
-      "cell_type": "markdown",
-      "metadata": {},
-      "source": [
-        "# needle-see — 20-layer graft run on Kaggle\n",
-        "\n",
-        "1. Upload the project as `needle-see.zip` to this notebook's files.\n",
-        "2. Set add-on data to Cactus-Compute/needle3 (optional — the trainer downloads it).\n",
-        "3. GPU on the right (T4 or P100). Turn on Accelerator.\n",
-        "4. Run cells top to bottom."
-      ]
-    },
-    {
-      "cell_type": "code",
-      "execution_count": null,
-      "metadata": {},
-      "outputs": [],
-      "source": [
-        "!pip -q install \"jax[cuda12]\" flax optax safetensors sentencepiece onnxruntime onnx pillow huggingface_hub"
-      ]
-    },
-    {
-      "cell_type": "code",
-      "execution_count": null,
-      "metadata": {},
-      "outputs": [],
-      "source": [
-        "!rm -rf /kaggle/working/needle-see && unzip -q /kaggle/input/needle-see/needle-see.zip -d /kaggle/working"
-      ]
-    },
-    {
-      "cell_type": "code",
-      "execution_count": null,
-      "metadata": {},
-      "outputs": [],
-      "source": [
-        "!ls /kaggle/working/needle-see/tools && cd /kaggle/working/needle-see && python tools/export_clip_patches.py"
-      ]
-    },
-    {
-      "cell_type": "code",
-      "execution_count": null,
-      "metadata": {},
-      "outputs": [],
-      "source": [
-        "import os\n",
-        "os.chdir('/kaggle/working/needle-see')\n",
-        "!git clone --depth 1 https://github.com/$(echo unused) /tmp/_noop 2>/dev/null; echo ok"
-      ]
-    },
-    {
-      "cell_type": "code",
-      "execution_count": null,
-      "metadata": {},
-      "outputs": [],
-      "source": [
-        "import os\n",
-        "os.chdir('/kaggle/working/needle-see')\n",
-        "os.environ['NEEDLE_COUNT'] = '12000'\n",
-        "os.environ['NEEDLE_VAL'] = '1200'\n",
-        "os.environ['NEEDLE_EPOCHS'] = '4'\n",
-        "os.environ['NEEDLE_BATCH'] = '32'\n",
-        "os.environ['NEEDLE_LAYERS'] = '20'\n",
-        "!python /kaggle/working/needle-see/kaggle/run_kaggle.py"
-      ]
-    }
-  ],
-  "metadata": {
-    "kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
-    "language_info": {"name": "python", "version": "3.10"},
-  },
-  "nbformat": 4,
-  "nbformat_minor": 5
-}
-EOF
-ls -la /home/maaz/Work/system1-research/needle-see/kaggle
+"""Kaggle entry point for the 20-layer graft (run after uploading the project).
+
+Usage:
+    python kaggle/run_kaggle.py
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+PROJECT = Path("/kaggle/working/needle-see")
+if PROJECT.exists():
+    os.chdir(PROJECT)
+sys.path.insert(0, str(PROJECT))
+
+COUNT = int(os.environ.get("NEEDLE_COUNT", "24000"))
+VAL = int(os.environ.get("NEEDLE_VAL", "2400"))
+DATA = "data"
+FEATURES = "features"
+OUT = "graft"
+
+
+def run(*argv):
+    print(" ".join(argv), flush=True)
+    result = subprocess.run(list(argv))
+    if result.returncode != 0:
+        raise SystemExit(result.returncode)
+
+
+if not Path(f"{DATA}/train.jsonl").exists():
+    run("python", "-m", "needlesee.data.gen", "--out", DATA,
+        "--count", str(COUNT), "--seed", "1", "--split", "train",
+        "--noise", "light", "--rotate", "4")
+    run("python", "-m", "needlesee.data.gen", "--out", DATA,
+        "--count", str(VAL), "--seed", "2", "--split", "val",
+        "--noise", "light", "--rotate", "4")
+
+if not Path(f"{FEATURES}/train.npy").exists():
+    run("python", "-m", "needlesee.data.precompute", "--jsonl",
+        f"{DATA}/train.jsonl", "--out", FEATURES)
+    run("python", "-m", "needlesee.data.precompute", "--jsonl",
+        f"{DATA}/val.jsonl", "--out", FEATURES)
+
+sys.argv = [
+    "train", "--data-dir", DATA, "--features", FEATURES, "--out", OUT,
+    "--layers", os.environ.get("NEEDLE_LAYERS", "20"),
+    "--epochs", os.environ.get("NEEDLE_EPOCHS", "6"),
+    "--batch-size", os.environ.get("NEEDLE_BATCH", "32"),
+    "--lora-rank", os.environ.get("NEEDLE_RANK", "16"),
+    "--lora-alpha", os.environ.get("NEEDLE_ALPHA", "32"),
+    "--eval-val", os.environ.get("NEEDLE_EVAL", "512"),
+    "--seed", "0",
+]
+if os.environ.get("NEEDLE_SMOKE") == "1":
+    sys.argv.append("--smoke")
+
+from needlesee.train.train_graft import main as train_main
+code = train_main()
+print("train() returned", code)
+PYEOF
+echo written
