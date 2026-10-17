@@ -94,3 +94,19 @@ if os.environ.get("NEEDLE_SMOKE") == "1":
 from needlesee.train.train_graft import main as train_main
 code = train_main()
 print("train() returned", code, flush=True)
+
+# Print the graft.json for easy extraction from kernel log
+import json as _json
+graft_json_path = PROJECT / OUT / "graft.json"
+if graft_json_path.exists():
+    print("GRAFT_JSON_START", flush=True)
+    print(graft_json_path.read_text(), flush=True)
+    print("GRAFT_JSON_END", flush=True)
+
+# Clean up large intermediate files to reduce output size
+import shutil
+for d in [DATA, FEATURES]:
+    dpath = PROJECT / d
+    if dpath.exists():
+        shutil.rmtree(dpath)
+        print(f"Cleaned up {d}/", flush=True)
