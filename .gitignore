@@ -6,4 +6,3 @@ features/
 __pycache__/
 **/*.pyc
 .pytest_cache/
-models/clip_vision_patches.onnx

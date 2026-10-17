@@ -61,5 +61,3 @@ if os.environ.get("NEEDLE_SMOKE") == "1":
 from needlesee.train.train_graft import main as train_main
 code = train_main()
 print("train() returned", code)
-PYEOF
-echo written
