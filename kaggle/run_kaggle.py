@@ -13,9 +13,32 @@ import sys
 from pathlib import Path
 
 PROJECT = Path("/kaggle/working/needle-see")
-if PROJECT.exists():
-    os.chdir(PROJECT)
+if not PROJECT.exists():
+    # Maybe cloned elsewhere; try cwd
+    PROJECT = Path.cwd()
+    if not (PROJECT / "needlesee").exists():
+        print("ERROR: project not found at /kaggle/working/needle-see or cwd", flush=True)
+        sys.exit(1)
+
+os.chdir(PROJECT)
 sys.path.insert(0, str(PROJECT))
+os.environ["PYTHONPATH"] = str(PROJECT) + os.pathsep + os.environ.get("PYTHONPATH", "")
+
+print(f"PROJECT={PROJECT}", flush=True)
+print(f"cwd={os.getcwd()}", flush=True)
+print(f"needlesee exists: {(PROJECT / 'needlesee').exists()}", flush=True)
+
+# Ensure the patched CLIP model is available (download Xenova if needed)
+clip_onnx = PROJECT / "models" / "clip_vision_patches.onnx"
+if not clip_onnx.exists():
+    print("Downloading Xenova CLIP model and exporting patch tokens...", flush=True)
+    from huggingface_hub import hf_hub_download
+    src = hf_hub_download("Xenova/clip-vit-base-patch32",
+                          "onnx/vision_model_quantized.onnx")
+    print(f"  downloaded to {src}", flush=True)
+    run("python", "tools/export_clip_patches.py", "--source", str(src),
+        "--out", str(clip_onnx))
+    print(f"  exported to {clip_onnx}", flush=True)
 
 COUNT = int(os.environ.get("NEEDLE_COUNT", "24000"))
 VAL = int(os.environ.get("NEEDLE_VAL", "2400"))
@@ -26,7 +49,7 @@ OUT = "graft"
 
 def run(*argv):
     print(" ".join(argv), flush=True)
-    result = subprocess.run(list(argv))
+    result = subprocess.run(list(argv), cwd=str(PROJECT), env=os.environ.copy())
     if result.returncode != 0:
         raise SystemExit(result.returncode)
 
