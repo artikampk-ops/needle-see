@@ -1,8 +1,8 @@
 .venv/
 out/
 scratchpad/
-data/
-features/
+/data/
+/features/
 __pycache__/
 **/*.pyc
 .pytest_cache/
