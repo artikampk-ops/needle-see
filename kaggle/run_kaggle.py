@@ -154,3 +154,16 @@ for d in [DATA, FEATURES]:
     if dpath.exists():
         shutil.rmtree(dpath)
         print(f"Cleaned up {d}/", flush=True)
+
+# Remove the cloned repo to reduce output size (keep only graft bundle)
+# Copy graft to /kaggle/working/ first
+graft_src = PROJECT / OUT
+graft_dst = Path("/kaggle/working/graft")
+if graft_src.exists() and not graft_dst.exists():
+    shutil.copytree(graft_src, graft_dst)
+    print(f"Copied graft bundle to {graft_dst}", flush=True)
+
+# Remove the cloned repo
+if PROJECT.exists():
+    shutil.rmtree(PROJECT)
+    print(f"Removed {PROJECT} to reduce output size", flush=True)
